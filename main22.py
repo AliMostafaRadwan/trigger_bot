@@ -1,0 +1,69 @@
+import torch
+import cv2
+import numpy as np
+from mss import mss
+import pydirectinput
+import pyautogui
+
+model = torch.hub.load(r'D:\programming\Val_AIM\yolov5-master', 'custom', path=r'sources\best2.pt', source='local')
+def CalculateDistance(x,y): ## distance : (-100,100) -> "n,100,p,100*"
+    if x < 0:
+        x *=-1
+        x_d = "n"
+    else:
+        x_d = "p"
+    if y < 0:
+        y*=-1
+        y_d = "n"
+    else:
+        y_d = "p"
+
+    x_v = int(x/5)
+    y_v = int(y/5)
+    code = x_d + "," + str(x_v) + "," + y_d + "," + str(y_v) + "*"
+    #print(code)
+    return code
+
+
+with mss() as sct:
+    monitor = {"top": 220, "left": 640, "width": 640, "height":640}
+
+    while(True):
+        screenshot = np.array(sct.grab(monitor))
+        results = model(screenshot, size=640)
+        df= results.pandas().xyxy[0]
+        rl = results.xyxy[0].tolist()
+        try:
+            xmin = int(df.iloc[0,0])
+            ymin = int(df.iloc[0,1])
+            xmax = int(df.iloc[0,2])
+            ymax = int(df.iloc[0,3])
+
+            head_level = (int(xmin + (xmax - xmin) / 2), int(ymin + (ymax - ymin) / 8))
+            cv2.circle(screenshot, head_level, 4, (0,255,0), thickness = -1)
+            cv2.rectangle(screenshot, (xmin, ymin), (xmax, ymax), (255,0,0), 2)
+
+            distance = (head_level[0] - 320, head_level[1] -320)
+            x = xmax
+            y = ymax
+            #get distance from center of the window
+            # def getDistance(x, y):
+            #     return math.sqrt(((x - (monitor['width'] / 2)) ** 2) + ((y - (monitor['height'] / 2)) ** 2))
+            
+            width = int(rl[0][2]) - int(rl[0][0])
+            print('width: ',width)
+            height = int(rl[0][3]) - int(rl[0][1])
+            print('height: ',height)
+            xpos = int(.20 * ((x - (width/2)) - pyautogui.position()[0]))
+            ypos = int(.27 * ((y - (height/2)) - pyautogui.position()[1]))
+            pydirectinput.moveRel(xpos, ypos)
+            #pyautogui.click(.20,,.27)
+            pydirectinput.moveRel(-xpos, -ypos)
+            #pydirectinput.moveRel(int(distance[0]), int(distance[1]))
+        except:
+            print("",end="")
+
+        cv2.imshow("frame", screenshot)
+        if(cv2.waitKey(1) == ord('q')):
+            cv2.destroyAllWindows()
+            break
